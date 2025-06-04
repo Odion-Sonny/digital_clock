@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cascading Digital Clock</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 10px;
+            background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
+            font-family: 'Arial', monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: auto;
+            overflow-y: hidden;
+        }
+
+        .clock-container {
+            display: flex;
+            gap: clamp(8px, 2vw, 15px);
+            perspective: 1000px;
+            align-items: center;
+            flex-wrap: nowrap;
+            justify-content: center;
+        }
+
+        .digit-column {
+            width: clamp(40px, 8vw, 60px);
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .digit-column.hours-tens { height: clamp(80px, 15vh, 120px); }
+        .digit-column.hours-units { height: clamp(220px, 40vh, 330px); }
+        .digit-column.minutes-tens { height: clamp(140px, 25vh, 210px); }
+        .digit-column.minutes-units { height: clamp(220px, 40vh, 330px); }
+        .digit-column.seconds-tens { height: clamp(140px, 25vh, 210px); }
+        .digit-column.seconds-units { height: clamp(220px, 40vh, 330px); }
+
+        .digit-strip {
+            position: absolute;
+            width: 100%;
+            transition: transform 0.4s ease-out;
+        }
+
+        .digit {
+            width: 100%;
+            height: clamp(20px, 4vh, 30px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: clamp(12px, 2.5vw, 18px);
+            font-weight: bold;
+            color: #fff;
+            position: relative;
+            background: linear-gradient(145deg, #f0f0f0, #d0d0d0);
+            border-radius: clamp(6px, 1.5vw, 10px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3), inset 0 1px 5px rgba(255, 255, 255, 0.5);
+            margin-bottom: 1px;
+        }
+
+        .digit:nth-child(odd) {
+            background: linear-gradient(145deg, #666, #555);
+            color: #fff;
+        }
+
+        .digit:nth-child(even) {
+            background: linear-gradient(145deg, #777, #666);
+            color: #fff;
+        }
+
+        .current-digit {
+            background: linear-gradient(145deg, #4a90e2, #357abd) !important;
+            box-shadow: 0 2px 10px rgba(74, 144, 226, 0.5), inset 0 1px 3px rgba(255, 255, 255, 0.3);
+            transform: scale(1.05);
+            z-index: 10;
+        }
+
+        .separator {
+            width: clamp(15px, 3vw, 20px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: clamp(10px, 3vh, 20px);
+            align-self: center;
+            flex-shrink: 0;
+        }
+
+        .separator-dot {
+            width: clamp(6px, 1.5vw, 8px);
+            height: clamp(6px, 1.5vw, 8px);
+            background: linear-gradient(145deg, #4a90e2, #357abd);
+            border-radius: 50%;
+            box-shadow: 0 3px 10px rgba(74, 144, 226, 0.4);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(0.8); }
+        }
+
+        .time-label {
+            position: absolute;
+            top: clamp(20px, 5vh, 50px);
+            left: clamp(20px, 5vw, 50px);
+            color: rgba(255, 255, 255, 0.7);
+            font-size: clamp(14px, 3vw, 18px);
+            letter-spacing: clamp(1px, 0.5vw, 3px);
+            text-transform: uppercase;
+            z-index: 999;
+        }
+
+        .control-panel {
+            position: fixed;
+            top: clamp(10px, 2vh, 20px);
+            right: clamp(10px, 2vw, 20px);
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: clamp(8px, 2vw, 15px);
+            border-radius: clamp(6px, 1.5vw, 10px);
+            display: flex;
+            gap: clamp(6px, 1.5vw, 10px);
+            align-items: center;
+            z-index: 1000;
+            flex-wrap: wrap;
+        }
+
+        .control-panel input,
+        .control-panel button {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: none;
+            padding: clamp(4px, 1vw, 8px) clamp(6px, 1.5vw, 12px);
+            font-size: clamp(12px, 2vw, 14px);
+            border-radius: clamp(4px, 1vw, 6px);
+            outline: none;
+            min-width: clamp(60px, 15vw, 80px);
+        }
+
+        /* Media queries for mobile devices */
+        @media (max-width: 768px) {
+            .clock-container {
+                gap: 8px;
+                transform: scale(0.9);
+            }
+            
+            .control-panel {
+                top: 10px;
+                right: 10px;
+                max-width: calc(100vw - 160px); /* Leave space for title */
+            }
+            
+            .time-label {
+                top: 15px;
+                left: 15px;
+                font-size: 14px;
+                letter-spacing: 1px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .clock-container {
+                gap: 6px;
+                transform: scale(0.8);
+            }
+            
+            .control-panel {
+                position: fixed;
+                top: auto;
+                bottom: 10px;
+                right: 10px;
+                left: 10px;
+                right: 10px;
+                justify-content: center;
+                flex-direction: row;
+                gap: 8px;
+                padding: 10px;
+                max-width: none;
+            }
+            
+            .control-panel input,
+            .control-panel button {
+                flex: 1;
+                text-align: center;
+                min-width: auto;
+            }
+            
+            .time-label {
+                top: 10px;
+                left: 10px;
+            }
+        }
+
+        @media (max-height: 600px) {
+            .digit-column.hours-tens { height: 60px; }
+            .digit-column.hours-units { height: 180px; }
+            .digit-column.minutes-tens { height: 120px; }
+            .digit-column.minutes-units { height: 180px; }
+            .digit-column.seconds-tens { height: 120px; }
+            .digit-column.seconds-units { height: 180px; }
+            
+            .time-label {
+                top: 10px;
+                left: 10px;
+                font-size: 12px;
+            }
+            
+            .control-panel {
+                top: 5px;
+                right: 5px;
+                padding: 6px;
+                gap: 6px;
+            }
+        }
+
+        @media (max-width: 320px) {
+            .time-label {
+                font-size: 12px;
+                letter-spacing: 0.5px;
+            }
+            
+            .control-panel {
+                bottom: 5px;
+                padding: 8px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="time-label">Digital Clock</div>
+    <div class="clock-container" id="clockContainer">
+        <!-- Hours tens -->
+        <div class="digit-column hours-tens">
+            <div class="digit-strip" id="hoursTens"></div>
+        </div>
+
+        <!-- Hours units -->
+        <div class="digit-column hours-units">
+            <div class="digit-strip" id="hoursUnits"></div>
+        </div>
+
+        <!-- Separator -->
+        <div class="separator">
+            <div class="separator-dot"></div>
+            <div class="separator-dot"></div>
+        </div>
+
+        <!-- Minutes tens -->
+        <div class="digit-column minutes-tens">
+            <div class="digit-strip" id="minutesTens"></div>
+        </div>
+
+        <!-- Minutes units -->
+        <div class="digit-column minutes-units">
+            <div class="digit-strip" id="minutesUnits"></div>
+        </div>
+
+        <!-- Separator -->
+        <div class="separator">
+            <div class="separator-dot"></div>
+            <div class="separator-dot"></div>
+        </div>
+
+        <!-- Seconds tens -->
+        <div class="digit-column seconds-tens">
+            <div class="digit-strip" id="secondsTens"></div>
+        </div>
+
+        <!-- Seconds units -->
+        <div class="digit-column seconds-units">
+            <div class="digit-strip" id="secondsUnits"></div>
+        </div>
+    </div>
+
+    <div class="control-panel">
+        <span class="control-label">Set Time:</span>
+        <input type="time" id="customTime" step="1">
+        <button onclick="clock.setCustomTime()">Set</button>
+        <button onclick="clock.resetTime()">Reset</button>
+    </div>
+
+    <script>
+        class CascadingClock {
+            constructor() {
+                this.strips = {
+                    hoursTens: document.getElementById('hoursTens'),
+                    hoursUnits: document.getElementById('hoursUnits'),
+                    minutesTens: document.getElementById('minutesTens'),
+                    minutesUnits: document.getElementById('minutesUnits'),
+                    secondsTens: document.getElementById('secondsTens'),
+                    secondsUnits: document.getElementById('secondsUnits')
+                };
+
+                this.previousTime = { hours: -1, minutes: -1, seconds: -1 };
+                this.useCustomTime = false;
+                this.customTime = new Date();
+
+                this.initializeDigits();
+                this.updateClock();
+                this.interval = setInterval(() => this.updateClock(), 1000);
+            }
+
+            setCustomTime() {
+                const timeInput = document.getElementById('customTime').value;
+                if (timeInput) {
+                    const [h, m, s] = timeInput.split(':').map(Number);
+                    this.customTime = new Date();
+                    this.customTime.setHours(h, m, s || 0);
+                    this.useCustomTime = true;
+                    this.updateClock();
+                }
+            }
+
+            resetTime() {
+                this.useCustomTime = false;
+                document.getElementById('customTime').value = '';
+                this.updateClock();
+            }
+
+            initializeDigits() {
+                this.createDigitStrip('hoursTens', 0, 2);
+                this.createDigitStrip('hoursUnits', 0, 9);
+                this.createDigitStrip('minutesTens', 0, 5);
+                this.createDigitStrip('minutesUnits', 0, 9);
+                this.createDigitStrip('secondsTens', 0, 5);
+                this.createDigitStrip('secondsUnits', 0, 9);
+            }
+
+            createDigitStrip(stripId, min, max) {
+                const strip = this.strips[stripId];
+                strip.innerHTML = '';
+                for (let i = min; i <= max; i++) {
+                    const digit = document.createElement('div');
+                    digit.className = 'digit';
+                    digit.textContent = i;
+                    strip.appendChild(digit);
+                }
+            }
+
+            updateClock() {
+                let now;
+                if (this.useCustomTime) {
+                    this.customTime.setSeconds(this.customTime.getSeconds() + 1);
+                    now = new Date(this.customTime);
+                } else {
+                    now = new Date();
+                }
+
+                const hours = now.getHours();
+                const minutes = now.getMinutes();
+                const seconds = now.getSeconds();
+
+                // Subtle midnight effect - only when going from 23:59:59 to 00:00:00
+                if (!this.useCustomTime && 
+                    this.previousTime.hours === 23 && this.previousTime.minutes === 59 && this.previousTime.seconds === 59 &&
+                    hours === 0 && minutes === 0 && seconds === 0) {
+                    this.triggerMidnightEffect();
+                }
+
+                this.updateDigitPosition('hoursTens', Math.floor(hours / 10), 0, 2);
+                this.updateDigitPosition('hoursUnits', hours % 10, 0, 9);
+                this.updateDigitPosition('minutesTens', Math.floor(minutes / 10), 0, 5);
+                this.updateDigitPosition('minutesUnits', minutes % 10, 0, 9);
+                this.updateDigitPosition('secondsTens', Math.floor(seconds / 10), 0, 5);
+                this.updateDigitPosition('secondsUnits', seconds % 10, 0, 9);
+
+                this.previousTime = { hours, minutes, seconds };
+            }
+
+            updateDigitPosition(stripId, value, min, max) {
+                const strip = this.strips[stripId];
+                const column = strip.parentElement;
+                const columnHeight = column.offsetHeight;
+                const centerY = columnHeight / 2;
+                const currentIndex = value - min;
+                
+                // Calculate digit height dynamically based on actual rendered height
+                const firstDigit = strip.querySelector('.digit');
+                const digitHeight = firstDigit ? firstDigit.offsetHeight + 1 : 31; // +1 for margin
+                
+                const offset = centerY - (digitHeight / 2) - (currentIndex * digitHeight);
+                
+                strip.style.transform = `translateY(${offset}px)`;
+
+                const digits = strip.querySelectorAll('.digit');
+                digits.forEach((digit, index) => {
+                    digit.classList.remove('current-digit');
+                    if (index === currentIndex) {
+                        digit.classList.add('current-digit');
+                    }
+                });
+            }
+
+            triggerMidnightEffect() {
+                // Subtle glow effect on the clock container only
+                const container = document.getElementById('clockContainer');
+                container.classList.add('midnight-glow');
+                setTimeout(() => {
+                    container.classList.remove('midnight-glow');
+                }, 1000);
+            }
+        }
+
+        // Initialize the clock
+        const clock = new CascadingClock();
+    </script>
+</body>
+</html>
